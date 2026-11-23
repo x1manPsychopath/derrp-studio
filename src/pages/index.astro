@@ -1,0 +1,389 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">🌙</div>
+        <h1>Derrp Studio <small>Household Command Center</small></h1>
+      </div>
+      <nav class="main-nav" id="mainNav" aria-label="Modules">
+        <button class="nav-btn active" data-module="copy">Copy Studio</button>
+        <button class="nav-btn" data-module="mochi">Mochi &amp; Sessions</button>
+        <button class="nav-btn" data-module="planner">Week Planner</button>
+        <button class="nav-btn" data-module="queue">Queue &amp; Prompts</button>
+        <button class="nav-btn" data-module="commissions">Commission Prep</button>
+        <button class="nav-btn" data-module="promo">Promo &amp; Social</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Status strip: computed from the household pattern in America/New_York -->
+    <section class="status-strip" aria-label="Household status">
+      <div class="status-cell">
+        <div class="k">Tonight</div>
+        <div class="v" id="stripTonight">—</div>
+        <div class="s" id="stripTonightSub">Loading the household pattern…</div>
+      </div>
+      <div class="status-cell">
+        <div class="k">Next up</div>
+        <div class="v" id="stripNext">—</div>
+        <div class="s" id="stripNextSub">—</div>
+      </div>
+      <div class="status-cell">
+        <div class="k">Mochi bridge</div>
+        <div class="v" id="stripBridge">Not connected</div>
+        <div class="s" id="stripBridgeSub">Configure a host profile under Mochi &amp; Sessions.</div>
+      </div>
+    </section>
+
+    <!-- ============ COPY STUDIO ============ -->
+    <section class="module active" id="module-copy">
+      <div class="grid two">
+        <div class="card">
+          <h2>Copy Studio</h2>
+          <p class="lede">Build the full copy set for a stream. Standards are enforced as you type; drafts save to this browser.</p>
+
+          <label class="field">
+            <span>Creator</span>
+            <select id="csCreator">
+              <option value="neo">Neo — NeoDerrp</option>
+              <option value="ama">Ama — AmaDerrp</option>
+              <option value="duo">Duo — Neo + Ama</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Series</span>
+            <select id="csSeries"></select>
+          </label>
+
+          <label class="field">
+            <span>Hook (verb-first)</span>
+            <input type="text" id="csHook" placeholder="e.g. Surviving the first boss with zero heals" />
+            <span class="count" id="csHookCount"></span>
+          </label>
+
+          <label class="field">
+            <span id="csGameLabel">Game / Project</span>
+            <input type="text" id="csGame" placeholder="Exact Twitch category name or art project" />
+          </label>
+
+          <label class="field">
+            <span>Category</span>
+            <input type="text" id="csCategory" placeholder="Exact Twitch category (e.g. Metaphor: ReFantazio, Art)" />
+          </label>
+
+          <label class="field">
+            <span>Last time (optional — recap-led openers for MQM / UB)</span>
+            <input type="text" id="csLastTime" placeholder="One line: where the last stream left off" />
+          </label>
+
+          <label class="field">
+            <span>Discord invite link (used only when cross-posting)</span>
+            <input type="url" id="csInvite" value="https://discord.gg/pVPFG475Y7" />
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="csCrossPost" />
+            Cross-posting (include the invite link in the Discord post)
+          </label>
+
+          <h3>Save draft</h3>
+          <div class="row">
+            <input type="text" id="csDraftName" class="grow" placeholder="Draft name" />
+            <button class="btn" id="csSaveDraft">Save draft</button>
+          </div>
+          <ul class="list" id="csDraftList"></ul>
+        </div>
+
+        <div class="card">
+          <h2>Generated copy</h2>
+          <p class="lede">Updates live. Welcome text is kept TTS-safe: plain text only, no emoji, links, or markdown.</p>
+
+          <label class="field">
+            <span>Twitch title</span>
+            <textarea id="outTitle" rows="2"></textarea>
+            <span class="count" id="outTitleCount"></span>
+          </label>
+
+          <label class="field">
+            <span>Go-live message (≤ 90 chars)</span>
+            <textarea id="outGoLive" rows="2"></textarea>
+            <span class="count" id="outGoLiveCount"></span>
+          </label>
+
+          <label class="field">
+            <span>Welcome message (TTS-safe)</span>
+            <textarea id="outWelcome" rows="3"></textarea>
+            <span class="count" id="outWelcomeCount"></span>
+          </label>
+
+          <label class="field">
+            <span>Discord post</span>
+            <textarea id="outDiscord" rows="5"></textarea>
+          </label>
+
+          <div class="row">
+            <button class="btn amber" id="csExport">Export stream-config.json</button>
+            <button class="btn secondary" id="csCopyAll">Copy Discord post</button>
+          </div>
+          <p class="note">Export carries exactly the five keys the Mochi stream stack consumes at startup: twitchTitle, twitchCategory, goLiveMessage, welcomeMessage, discordMessage.</p>
+          <p class="error-text" id="csErrors"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MOCHI & SESSIONS ============ -->
+    <section class="module" id="module-mochi">
+      <div class="grid two">
+        <div class="card">
+          <h2>Host profiles</h2>
+          <p class="lede">A host profile is one Mochi bridge: label, bridge base URL, bridge token. Switching the active profile is how Mochi's hosting location changes — NeoDerrp PC today, derrp-server later. Profiles and tokens live only in this browser.</p>
+
+          <label class="field">
+            <span>Active host</span>
+            <select id="hostActive"></select>
+          </label>
+          <div class="row">
+            <span class="chip" id="bridgeStateChip"><span class="dot"></span><span id="bridgeStateText">Bridge not connected</span></span>
+            <button class="btn small" id="bridgeCheck">Check connection</button>
+            <button class="btn small secondary" id="bridgeRefresh">Refresh status</button>
+          </div>
+          <p class="note" id="bridgeDetail">No host profile configured yet. Add one below to connect to a bridge.</p>
+
+          <h3>Add / edit profile</h3>
+          <label class="field">
+            <span>Label</span>
+            <input type="text" id="hostLabel" placeholder="e.g. NeoDerrp (PC)" />
+          </label>
+          <label class="field">
+            <span>Bridge base URL (tailnet HTTPS address)</span>
+            <input type="url" id="hostUrl" placeholder="https://your-pc.your-tailnet.ts.net" />
+          </label>
+          <label class="field">
+            <span>Bridge token</span>
+            <input type="password" id="hostToken" placeholder="Bridge bearer token (never a stack token)" autocomplete="off" />
+          </label>
+          <div class="row">
+            <button class="btn" id="hostSave">Save profile</button>
+            <button class="btn danger" id="hostDelete">Delete active profile</button>
+          </div>
+          <p class="note">The Studio holds only the bridge's own token. Stack credentials never leave the PC — the bridge injects them itself.</p>
+        </div>
+
+        <div class="card">
+          <h2>Mochi stack</h2>
+          <p class="lede">Component status comes from the bridge (<code>GET /status</code>) when connected. Without a bridge, status is honestly unknown — never guessed.</p>
+          <div class="stack-grid" id="stackGrid"></div>
+          <p class="note" id="sessionBridgeNote">Session state from the bridge (<code>GET /session</code>) will appear here when connected.</p>
+          <div class="output-box" id="sessionBridgeBox">Bridge not connected — no live session state available.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:1rem;">
+        <h2>Config files</h2>
+        <p class="lede">Allowlisted configs the bridge serves: <code>stream-config.json</code>, Mochi personality / profile prompt files, and AI-Mochi vault files. Writes go through the bridge only — backup-first, validated, and revertible — and stay disabled until the bridge reports live control.</p>
+        <div class="row">
+          <button class="btn secondary" id="cfgLoad" disabled>Load config list from bridge</button>
+          <span class="note" id="cfgState">Connect a bridge to browse config files.</span>
+        </div>
+        <ul class="list" id="cfgList"></ul>
+        <label class="field">
+          <span>File contents</span>
+          <textarea id="cfgContent" rows="10" placeholder="Select a config file to view it here." disabled></textarea>
+        </label>
+        <div class="row">
+          <button class="btn" id="cfgSave" disabled>Save via bridge (backup-first)</button>
+          <button class="btn secondary" id="cfgRevert" disabled>Revert last write</button>
+          <span class="note" id="cfgLockNote">Editing is locked: writes require a connected bridge with control unlocked.</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:1rem;">
+        <h2>Sessions</h2>
+        <p class="lede">The nine-stage lifecycle, tracked locally. When the bridge is connected, live session state shows above; this checklist stays manual either way, so the Studio is useful with the bridge off.</p>
+        <div class="row">
+          <input type="text" id="sessName" class="grow" placeholder="Session name (e.g. Main Quest Monday — Metaphor)" />
+          <button class="btn" id="sessCreate">New session</button>
+          <select id="sessActive" class="grow"></select>
+          <button class="btn danger" id="sessDelete">Delete session</button>
+        </div>
+        <ol class="stage-list" id="stageList" style="margin-top:0.8rem;"></ol>
+        <label class="field">
+          <span>Post-stream review notes</span>
+          <textarea id="sessNotes" rows="4" placeholder="What worked, what broke, what to change next time…"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <!-- ============ WEEK PLANNER ============ -->
+    <section class="module" id="module-planner">
+      <div class="card">
+        <h2>Household week</h2>
+        <p class="lede" id="plannerRange">The ruled Mon–Sun pattern, pre-filled on real dates. Saturday is family day: scheduling anything there requires a typed override note — no exceptions.</p>
+        <div class="week-grid" id="weekGrid"></div>
+        <p class="error-text" id="plannerError"></p>
+      </div>
+    </section>
+
+    <!-- ============ QUEUE & PROMPTS ============ -->
+    <section class="module" id="module-queue">
+      <div class="grid two">
+        <div class="card">
+          <h2>Request queue</h2>
+          <p class="lede">Ama's commission &amp; drawing-request queue. Requester names are hidden by default — anonymous-by-default, on purpose.</p>
+          <label class="switch">
+            <input type="checkbox" id="queueAnon" checked />
+            Anonymous by default (hide requester names)
+          </label>
+          <div class="row" style="margin-top:0.6rem;">
+            <input type="text" id="qRequester" class="grow" placeholder="Requester (kept private when anonymous)" />
+            <input type="text" id="qItem" class="grow" placeholder="Request (e.g. coloured doodle of my OC)" />
+            <button class="btn" id="qAdd">Add</button>
+          </div>
+          <ul class="list" id="qList"></ul>
+
+          <h3>Reference — bits &amp; subs</h3>
+          <ul class="list">
+            <li><span class="grow">Bits 100</span><span class="meta">derp doodle</span></li>
+            <li><span class="grow">Bits 500</span><span class="meta">coloured doodle</span></li>
+            <li><span class="grow">Bits 1,000</span><span class="meta">full piece</span></li>
+            <li><span class="grow">Sub T1</span><span class="meta">Derpling</span></li>
+            <li><span class="grow">Sub T2</span><span class="meta">Cryptid — priority requests</span></li>
+            <li><span class="grow">Sub T3</span><span class="meta">Cryptid + raffle entry</span></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>Prompt Jar</h2>
+          <p class="lede">Drop in drawing prompts; pull one at random when the jar gets shaken on stream.</p>
+          <div class="row">
+            <input type="text" id="jarInput" class="grow" placeholder="New prompt…" />
+            <button class="btn" id="jarAdd">Add prompt</button>
+            <button class="btn amber" id="jarDraw">Draw one</button>
+          </div>
+          <div class="output-box" id="jarResult" style="margin-top:0.7rem;">The jar is waiting.</div>
+          <ul class="list" id="jarList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ COMMISSION PREP ============ -->
+    <section class="module" id="module-commissions">
+      <div class="grid two">
+        <div class="card">
+          <h2>Commission Prep</h2>
+          <p class="lede">Prep sheet for Ama's commissions. Client identity stays off the sheet unless you deliberately turn anonymity off.</p>
+          <label class="switch">
+            <input type="checkbox" id="cpAnon" checked />
+            Anonymous prep sheet (hide client name)
+          </label>
+          <label class="field">
+            <span>Client name</span>
+            <input type="text" id="cpClient" placeholder="Client (hidden while anonymous)" />
+          </label>
+          <label class="field">
+            <span>Piece type</span>
+            <select id="cpType">
+              <option value="headshot">Headshot</option>
+              <option value="bust">Bust-up</option>
+              <option value="full">Full body</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Subject / character</span>
+            <input type="text" id="cpSubject" placeholder="Who or what is being drawn" />
+          </label>
+          <label class="field">
+            <span>Details &amp; references</span>
+            <textarea id="cpDetails" rows="4" placeholder="Pose, palette, must-haves, reference links the client provided…"></textarea>
+          </label>
+          <label class="field">
+            <span>Deadline (optional)</span>
+            <input type="text" id="cpDeadline" placeholder="e.g. before Friday's stream" />
+          </label>
+        </div>
+
+        <div class="card">
+          <h2>Pricing &amp; booking</h2>
+          <p class="lede">Commissions are booked through VGen only — never by DM. Prices stay link-only unless the price toggle is on.</p>
+          <p><a href="https://vgen.co/amaderrp" target="_blank" rel="noopener">vgen.co/amaderrp</a></p>
+          <label class="switch">
+            <input type="checkbox" id="cpShowPrices" />
+            Show prices (default: VGen-link-only)
+          </label>
+          <div id="cpPrices" style="display:none; margin-top:0.6rem;">
+            <ul class="list">
+              <li><span class="grow">Headshot</span><span class="meta">from $30</span></li>
+              <li><span class="grow">Bust-up</span><span class="meta">from $50</span></li>
+              <li><span class="grow">Full body</span><span class="meta">from $80</span></li>
+            </ul>
+            <p class="note">Commercial licence required for stream/business use.</p>
+          </div>
+          <p class="note" id="cpPriceNote">Prices hidden — copy points to the VGen page.</p>
+
+          <h3>Prep sheet</h3>
+          <div class="output-box" id="cpSheet">Fill in the prep form to generate the sheet.</div>
+          <div class="row" style="margin-top:0.6rem;">
+            <button class="btn secondary" id="cpCopy">Copy prep sheet</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PROMO & SOCIAL ============ -->
+    <section class="module" id="module-promo">
+      <div class="card">
+        <h2>Promo &amp; Social</h2>
+        <p class="lede">Cross-promo variants generated from the current Copy Studio set. Invite fields are editable and stored per browser — the Art Gloop invite is intentionally blank: a previously documented one is invalid, so paste the current invite before posting.</p>
+        <div class="grid two">
+          <label class="field">
+            <span>The Derrps — Discord invite</span>
+            <input type="url" id="promoInviteDerrps" value="https://discord.gg/pVPFG475Y7" />
+          </label>
+          <label class="field">
+            <span>Art Gloop — Discord invite (no default; paste the current one)</span>
+            <input type="url" id="promoInviteGloop" placeholder="Paste the current Art Gloop invite link" />
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn" id="promoGenerate">Generate from current copy set</button>
+          <span class="note" id="promoState">Uses whatever is currently in Copy Studio.</span>
+        </div>
+        <div class="grid two" style="margin-top:0.8rem;">
+          <div>
+            <h3>The Derrps (Discord)</h3>
+            <div class="output-box" id="promoDerrps">—</div>
+          </div>
+          <div>
+            <h3>Art Gloop (Discord)</h3>
+            <div class="output-box" id="promoGloop">—</div>
+          </div>
+          <div>
+            <h3>YouTube</h3>
+            <div class="output-box" id="promoYoutube">—</div>
+          </div>
+          <div>
+            <h3>Shorts</h3>
+            <div class="output-box" id="promoShorts">—</div>
+          </div>
+          <div>
+            <h3>Instagram</h3>
+            <div class="output-box" id="promoInsta">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    Derrp Studio — NeoDerrp &amp; AmaDerrp's household command center. Drafts, planner entries, and host profiles are stored locally in this browser; stream control runs only through the Mochi bridge on the tailnet.
+  </footer>
+
+  <script>
+    import '../scripts/app.js';
+  </script>
+</Layout>

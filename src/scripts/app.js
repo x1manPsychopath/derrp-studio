@@ -302,19 +302,20 @@ function escapeHtml(s) {
 /* ================= MOCHI BRIDGE =================
    Contract: Derrp-Studio-Tailscale-Bridge-Spec.md.
    GET /health, GET /status, GET /session, config reads (GET /config,
-   GET /config/:id); control-class writes (POST /config/:id,
+   GET /config/item?id=<id>); control-class writes (POST /config/item,
    POST /config/revert) only when the bridge reports control unlocked.
+   Route contract verified against bridge v1 source 2026-11-23.
    The Studio NEVER fabricates status: no bridge, no data. */
 
 const STACK = [
-  { key: 'core', name: 'Mochi Core', port: 8000, role: 'Mochi brain — chat, memory, research routing', match: 'core' },
-  { key: 'api', name: 'Command Center API', port: 8100, role: 'Session lifecycle + control candidate (rc)', match: 'command' },
-  { key: 'sidecar', name: 'Voice sidecar', port: 8770, role: 'Speech path: Core → Voicebox → stream mix', match: 'sidecar' },
+  { key: 'mochi_core', name: 'Mochi Core', port: 8000, role: 'Mochi brain — chat, memory, research routing', match: 'core' },
+  { key: 'candidate', name: 'Command Center API', port: 8100, role: 'Session lifecycle + control candidate (rc)', match: 'command' },
+  { key: 'voice_sidecar', name: 'Voice sidecar', port: 8770, role: 'Speech path: Core → Voicebox → stream mix', match: 'sidecar' },
   { key: 'voicebox', name: 'Voicebox', port: 17493, role: 'TTS engine hosting the “Mochi” voice profile', match: 'voicebox' },
   { key: 'research', name: 'Research service', port: 8765, role: 'Grounding / research for chat answers', match: 'research' },
   { key: 'streamerbot', name: 'Streamer.bot', port: 8081, role: 'Twitch events + action bridge (WebSocket)', match: 'streamer' },
-  { key: 'speakerbot', name: 'Speaker.bot', port: 7681, role: 'Legacy speech surface', match: 'speaker' },
-  { key: 'obs', name: 'OBS WebSocket', port: 4455, role: 'Scene / source control + status', match: 'obs' },
+  { key: 'speakerbot', name: 'Speaker.bot', port: 7681, role: 'Legacy speech surface (not probed by the bridge)', match: 'speaker' },
+  { key: 'obs_ws', name: 'OBS WebSocket', port: 4455, role: 'Scene / source control + status', match: 'obs' },
 ];
 
 /* mode: 'none' | 'unreachable' | 'readonly' | 'live' */
@@ -402,7 +403,7 @@ function componentState(comp) {
   const up = entry.up ?? entry.ok ?? entry.online ??
     (typeof entry.status === 'string' ? /up|ok|online|reachable|running/i.test(entry.status) : undefined);
   if (up === undefined) return null;
-  return { up: Boolean(up), latency: entry.latencyMs ?? entry.latency ?? null };
+  return { up: Boolean(up), latency: entry.latencyMs ?? entry.latency_ms ?? entry.latency ?? null };
 }
 
 function renderBridge() {
@@ -523,11 +524,11 @@ function initConfig() {
     $('cfgState').textContent = 'Loading config list…';
     try {
       const res = await bridgeFetch('/config');
-      const files = Array.isArray(res) ? res : res.files || [];
+      const files = res.items || res.files || (Array.isArray(res) ? res : []);
       bridge.configFiles = files;
       $('cfgList').innerHTML = files.map((f, i) => {
-        const name = f.name || f.path || f.id || `file-${i}`;
-        const meta = [f.hash ? `sha ${String(f.hash).slice(0, 10)}…` : '', f.modified || f.lastModified || '', f.effectiveWhen ? `effective: ${f.effectiveWhen}` : '']
+        const name = f.id || f.name || f.path || `file-${i}`;
+        const meta = [f.sha256 ? `sha ${String(f.sha256).slice(0, 10)}…` : f.hash ? `sha ${String(f.hash).slice(0, 10)}…` : '', f.last_modified || f.modified || f.lastModified || '', f.effective_when || f.effectiveWhen ? `effective: ${f.effective_when || f.effectiveWhen}` : '']
           .filter(Boolean).join(' · ');
         return `<li><span class="grow"><strong>${escapeHtml(name)}</strong>${meta ? ` <span class="meta">${escapeHtml(meta)}</span>` : ''}</span>
           <button class="btn small secondary" data-cfg-view="${i}">View</button></li>`;
@@ -545,7 +546,7 @@ function initConfig() {
     if (!f) return;
     const id = f.id || f.path || f.name;
     try {
-      const res = await bridgeFetch(`/config/${encodeURIComponent(id)}`);
+      const res = await bridgeFetch(`/config/item?id=${encodeURIComponent(id)}`);
       bridge.openFile = id;
       $('cfgContent').value = typeof res === 'string' ? res : res.content ?? res.raw ?? JSON.stringify(res, null, 2);
       renderBridge(); /* re-gates the editor based on live control */
@@ -561,7 +562,7 @@ function initConfig() {
   $('cfgSave').addEventListener('click', async () => {
     if (!bridge.openFile) return;
     try {
-      await bridgeFetch(`/config/${encodeURIComponent(bridge.openFile)}`, {
+      await bridgeFetch(`/config/item?id=${encodeURIComponent(bridge.openFile)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: $('cfgContent').value }),

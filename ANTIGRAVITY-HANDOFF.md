@@ -78,7 +78,7 @@ The website has no backend. The bridge is a separate, removable Python-stdlib se
 | Gate 0.5 — Config inventory | ✅ PASS |
 | Gate 1 — Bridge v1 local | ✅ PASS — originally 7/7 unit tests; suite is now **8/8** after the CORS test was added |
 | Gate 2 — Tailnet publish | ✅ PASS **except the iPhone cellular leg** — NeoDerrp enrolled, Serve live and tailnet-only. iPhone leg is **deferred, not failed**: Joshua cannot download the Tailscale iPhone app right now due to an Apple ID payment issue (Apple blocks even free downloads). Do not call Gate 2 fully passed, and do not substitute a LAN test for the cellular test. Waydroid on the Surface (`100.66.129.39`) is enrolled and can provide a second-device fetch as supporting evidence. |
-| Gate 3 — Studio wiring + kill test | ⬜ **NEXT — this is the first construction task in this handoff (see §7)** |
+| Gate 3 — Studio wiring + kill test | ✅ **COMPLETE 2026-11-24** — Joshua entered the NEODERRP host profile; panel shows Connected — read-only with live stack cards and the 33-file config list, editing locked as designed. (The §7 Task 3 sequence is retained as the re-test procedure if the connection ever needs re-proving.) |
 | Gate 4 — Control (v2) | 🔒 **BLOCKED.** Opens only on Joshua's explicit release-promotion GO in-session. Silence is not GO. |
 
 ### Bridge fixes already landed (2026-11-23 evening — do not redo)

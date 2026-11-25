@@ -42,6 +42,25 @@ This was ruled on 2026-11-23 after a near-miss, and it is not optional:
 - Per-task, narrowest folder, removed after the task if it was added for that task only.
 - Terminal / PowerShell checks (ports, HTTP, file reads) work from the repo workspace — no wider folder is needed to verify anything in this handoff.
 
+## 3b. Context7 — use before writing library/framework code (added 2026-11-25 at Joshua's instruction)
+
+Context7 is the one Antigravity marketplace plugin adopted for this workspace (Firebase, Notion, and Dynatrace were evaluated 2026-11-25 and ruled **skip** — do not add them for this project). Install: Customizations > Context7 > **Add**, then a free API key from context7.com/dashboard (free tier: 1,000 calls/month, roughly ~2 calls per lookup task — do not spend calls on every trivial edit).
+
+Before writing or changing code that uses a library/framework API (Astro, Next.js, Supabase, FastAPI, Pydantic, etc.):
+
+1. Call `resolve-library-id` for the library, using the version in this repo's `package.json` / lockfile if one is specified.
+2. Call `query-docs` with the specific API/task in question.
+3. Prefer the Context7 result over training data when they conflict.
+
+Pinned / settled facts Context7 must **not** override:
+
+- derrp-studio: Astro 5, static/PWA, **no service worker, no Firebase**
+- metaphor-companion: Next.js 15 + Supabase; Supabase CLI is pinned at **2.122.0** — do not suggest upgrading it mid-release
+- metaphor-desktop: C#/.NET 10 WPF, **read-only** memory reader — no `WriteProcessMemory` in this component
+- Mochi memory: SQLite (AI-Mochi) / ChromaDB (kevin-raven) — no Qdrant, no PostgreSQL 18.6 in the verified stack
+
+Context7 covers public library docs only. Never use it to assert what is installed, running, or configured locally — verify that from the repo, lockfiles, and runtime output.
+
 ## 4. The seven modules — what is built and verified
 
 All seven shipped in the scaffold and were verified locally. Do not rebuild them from scratch; maintain and extend them.

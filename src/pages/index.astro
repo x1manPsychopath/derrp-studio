@@ -16,6 +16,7 @@ import Layout from '../layouts/Layout.astro';
         <button class="nav-btn" data-module="queue">Queue &amp; Prompts</button>
         <button class="nav-btn" data-module="commissions">Commission Prep</button>
         <button class="nav-btn" data-module="promo">Promo &amp; Social</button>
+        <button class="nav-btn" data-module="companion">Companion</button>
       </nav>
     </div>
   </header>
@@ -374,6 +375,78 @@ import Layout from '../layouts/Layout.astro';
             <h3>Instagram</h3>
             <div class="output-box" id="promoInsta">—</div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ COMPANION ============ -->
+    <section class="module" id="module-companion">
+      <div class="grid three">
+        <div class="card">
+          <h2>Tracker</h2>
+          <p class="lede">Cloud Metaphor Companion tracker (Vercel + Supabase) — opens in a new tab.</p>
+          <label class="field">
+            <span>Tracker URL</span>
+            <input type="url" id="compTrackerUrl" placeholder="Paste the current Tracker address" />
+          </label>
+          <div class="row">
+            <button class="btn" id="compTrackerOpen" disabled>Open</button>
+            <span class="note" id="compTrackerNote">No address set yet</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Local / Stream Companion</h2>
+          <p class="lede">Local / stream Companion instance running on NeoDerrp during stream sessions.</p>
+          <label class="field">
+            <span>Local / Stream Companion URL</span>
+            <input type="url" id="compLocalUrl" placeholder="Paste the current local Companion address" />
+          </label>
+          <div class="row">
+            <button class="btn" id="compLocalOpen" disabled>Open</button>
+            <span class="note" id="compLocalNote">No address set yet</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>OBS Overlay</h2>
+          <p class="lede">Stream overlay view for OBS browser sources and pre-flight layout checks.</p>
+          <label class="field">
+            <span>OBS Overlay URL</span>
+            <input type="url" id="compOverlayUrl" placeholder="Paste the current OBS Overlay address" />
+          </label>
+          <div class="row">
+            <button class="btn" id="compOverlayOpen" disabled>Open</button>
+            <span class="note" id="compOverlayNote">No address set yet</span>
+          </div>
+
+          <h3>OBS overlay helper</h3>
+          <div class="output-box" id="compOverlayReadout">No address set yet</div>
+          <p class="note" style="margin-top:0.45rem;">Until party data is verified, use the overlay with <code>?panels=enemy,recs</code> (or disable the party panel) — the party block otherwise shows member levels plus the inactive slot.</p>
+          <div class="row" style="margin-top:0.45rem;">
+            <button class="btn small secondary" id="compOverlayCopySafe" disabled>Copy with ?panels=enemy,recs</button>
+            <button class="btn small secondary" id="compOverlayCopyBase" disabled>Copy stored base URL</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid two" style="margin-top:1rem;">
+        <div class="card">
+          <h2>Desktop reader</h2>
+          <p class="lede">The desktop reader is a separate read-only Windows app, launched from its own shortcut — it is report/status only here, the Studio does not launch it, and it never launches the game.</p>
+          <div class="row">
+            <button class="btn secondary" disabled>Not launched from Studio</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Launch from Studio — not built yet</h2>
+          <p class="lede">Bridge Launcher registry slot (Launcher spec entry #4).</p>
+          <div class="row">
+            <button class="btn" disabled>Launch</button>
+            <span class="chip warn"><span class="dot"></span>Not built yet</span>
+          </div>
+          <p class="note" style="margin-top:0.55rem;">The Companion launcher was spec'd but never built, so this card activates only when that launcher exists and Gate L reaches it.</p>
         </div>
       </div>
     </section>

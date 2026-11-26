@@ -882,6 +882,78 @@ function initPromo() {
   });
 }
 
+/* ================= METAPHOR COMPANION HUB =================
+   Configurable link hub only: all three URLs ship empty and persist per-browser
+   in localStorage. No hardcoded addresses, no iframe, no status polling, and
+   the Launcher slot (spec entry #4) stays disabled until built under Gate L. */
+
+function appendOverlaySafeParams(baseUrl) {
+  const raw = baseUrl.trim();
+  if (!raw) return '';
+  if (raw.includes('panels=enemy,recs')) return raw;
+  const hashIdx = raw.indexOf('#');
+  const beforeHash = hashIdx === -1 ? raw : raw.slice(0, hashIdx);
+  const hash = hashIdx === -1 ? '' : raw.slice(hashIdx);
+  const sep = beforeHash.includes('?') ? (beforeHash.endsWith('?') || beforeHash.endsWith('&') ? '' : '&') : '?';
+  return `${beforeHash}${sep}panels=enemy,recs${hash}`;
+}
+
+function initCompanion() {
+  const saved = store.get('ds.companion.v1', {});
+  if (saved.tracker) $('compTrackerUrl').value = saved.tracker;
+  if (saved.local) $('compLocalUrl').value = saved.local;
+  if (saved.overlay) $('compOverlayUrl').value = saved.overlay;
+
+  const syncCard = (inputId, openId, noteId) => {
+    const val = $(inputId).value.trim();
+    const hasUrl = Boolean(val);
+    $(openId).disabled = !hasUrl;
+    $(noteId).textContent = hasUrl ? 'Opens stored address in a new tab.' : 'No address set yet';
+    return val;
+  };
+
+  const renderCompanion = () => {
+    const tracker = syncCard('compTrackerUrl', 'compTrackerOpen', 'compTrackerNote');
+    const local = syncCard('compLocalUrl', 'compLocalOpen', 'compLocalNote');
+    const overlay = syncCard('compOverlayUrl', 'compOverlayOpen', 'compOverlayNote');
+
+    store.set('ds.companion.v1', { tracker, local, overlay });
+
+    const hasOverlay = Boolean(overlay);
+    $('compOverlayReadout').textContent = hasOverlay ? overlay : 'No address set yet';
+    $('compOverlayCopySafe').disabled = !hasOverlay;
+    $('compOverlayCopyBase').disabled = !hasOverlay;
+  };
+
+  ['compTrackerUrl', 'compLocalUrl', 'compOverlayUrl'].forEach((id) =>
+    $(id).addEventListener('input', renderCompanion)
+  );
+
+  const openStored = (inputId) => {
+    const val = $(inputId).value.trim();
+    if (!val) return;
+    window.open(val, '_blank', 'noopener');
+  };
+
+  $('compTrackerOpen').addEventListener('click', () => openStored('compTrackerUrl'));
+  $('compLocalOpen').addEventListener('click', () => openStored('compLocalUrl'));
+  $('compOverlayOpen').addEventListener('click', () => openStored('compOverlayUrl'));
+
+  $('compOverlayCopySafe').addEventListener('click', (e) => {
+    const val = $('compOverlayUrl').value.trim();
+    if (!val) return;
+    copyText(appendOverlaySafeParams(val), e.target);
+  });
+
+  $('compOverlayCopyBase').addEventListener('click', (e) => {
+    const val = $('compOverlayUrl').value.trim();
+    if (!val) return;
+    copyText(val, e.target);
+  });
+
+  renderCompanion();
+}
+
 /* ================= boot ================= */
 initNav();
 renderStatusStrip();
@@ -894,3 +966,4 @@ initPlanner();
 initQueue();
 initPrep();
 initPromo();
+initCompanion();

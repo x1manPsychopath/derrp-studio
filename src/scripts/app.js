@@ -92,6 +92,9 @@ function initNav() {
     if (!btn) return;
     document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b === btn));
     document.querySelectorAll('.module').forEach((m) => m.classList.toggle('active', m.id === `module-${btn.dataset.module}`));
+    if (btn.dataset.module === 'mochi' && activeProfile()) {
+      checkBridge();
+    }
   });
 }
 
@@ -273,7 +276,7 @@ function initCopyStudio() {
     }
   });
 
-  /* Export: EXACTLY the five keys mochi-stream's stream-config.json uses. */
+  /* Export: EXACTLY the five keys the Mochi stream stack's stream-config.json uses. */
   $('csExport').addEventListener('click', () => {
     const payload = {
       twitchTitle: $('outTitle').value,
@@ -319,7 +322,27 @@ const STACK = [
 ];
 
 /* mode: 'none' | 'unreachable' | 'readonly' | 'live' */
-const bridge = { mode: 'none', detail: '', status: null, session: null, configFiles: [], openFile: null };
+const bridge = {
+  mode: 'none',
+  detail: '',
+  status: null,
+  session: null,
+  launchers: null,
+  launcherUnlocked: false,
+  launcherHost: null,
+  launcherFeedback: {},
+  launcherPolling: {},
+  configFiles: [],
+  openFile: null,
+};
+
+function clearLauncherPolls() {
+  Object.keys(bridge.launcherPolling).forEach((id) => {
+    const p = bridge.launcherPolling[id];
+    if (p && p.timerId) clearTimeout(p.timerId);
+  });
+  bridge.launcherPolling = {};
+}
 
 const getHosts = () => store.get('ds.hosts.v1', { profiles: [], activeId: null });
 const activeProfile = () => {
@@ -346,18 +369,50 @@ async function bridgeFetch(path, opts = {}) {
   }
 }
 
+async function bridgePostLauncher(path) {
+  const p = activeProfile();
+  if (!p) throw new Error('No active host profile');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(p.url.replace(/\/+$/, '') + path, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${p.token}`, Accept: 'application/json' },
+      signal: ctrl.signal,
+    });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    return { ok: res.ok, status: res.status, data };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Control is live ONLY when the bridge itself says so — never inferred locally. */
 function controlUnlocked(status) {
   if (!status) return false;
   return status.controlUnlocked === true || status.control?.unlocked === true || status.control?.enabled === true;
 }
 
+async function fetchLaunchers() {
+  const res = await bridgeFetch('/launchers');
+  const list = Array.isArray(res?.launchers) ? res.launchers.slice() : [];
+  list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  bridge.launchers = list;
+  bridge.launcherUnlocked = Boolean(res?.launcher_unlocked);
+  bridge.launcherHost = res?.host || null;
+  return res;
+}
+
 async function checkBridge() {
   const p = activeProfile();
   if (!p) {
+    clearLauncherPolls();
     bridge.mode = 'none';
     bridge.detail = 'No host profile configured yet. Add one below to connect to a bridge.';
-    bridge.status = null; bridge.session = null;
+    bridge.status = null; bridge.session = null; bridge.launchers = null; bridge.launcherUnlocked = false;
+    bridge.launcherFeedback = {};
     renderBridge();
     return;
   }
@@ -366,9 +421,10 @@ async function checkBridge() {
   try {
     await bridgeFetch('/health');
   } catch (err) {
+    clearLauncherPolls();
     bridge.mode = 'unreachable';
     bridge.detail = `Unreachable — ${err.message}. The PC may be asleep, the bridge stopped, or this device is off the tailnet.`;
-    bridge.status = null; bridge.session = null;
+    bridge.status = null; bridge.session = null; bridge.launchers = null; bridge.launcherUnlocked = false;
     renderBridge();
     return;
   }
@@ -381,6 +437,12 @@ async function checkBridge() {
     bridge.session = await bridgeFetch('/session');
   } catch {
     bridge.session = null;
+  }
+  try {
+    await fetchLaunchers();
+  } catch {
+    bridge.launchers = null;
+    bridge.launcherUnlocked = false;
   }
   bridge.mode = controlUnlocked(bridge.status) ? 'live' : 'readonly';
   bridge.detail = bridge.mode === 'live'
@@ -459,6 +521,358 @@ function renderBridge() {
   $('cfgLockNote').textContent = bridge.mode === 'live'
     ? 'Control is live: edits are written via the bridge, backup-first and validated, and can be reverted.'
     : 'Editing is locked: writes require a connected bridge with control unlocked.';
+
+  renderLaunchpad();
+}
+
+function launcherStatusChip(status, pollAction) {
+  if (pollAction === 'launch') return { cls: 'warn', text: 'starting…' };
+  if (pollAction === 'stop') return { cls: 'warn', text: 'stopping…' };
+  if (status === 'Running') return { cls: 'ok', text: 'Running' };
+  if (status === 'Partial') return { cls: 'warn', text: 'Partial' };
+  if (status === 'Stopped') return { cls: 'bad', text: 'Stopped' };
+  return { cls: '', text: status || 'Unknown' };
+}
+
+function renderLaunchpad() {
+  const lockChip = $('launchpadLockChip');
+  const lockText = $('launchpadLockText');
+  const refreshBtn = $('launchpadRefresh');
+  const stateEl = $('launchpadState');
+  const grid = $('launchpadGrid');
+  if (!grid) return;
+
+  const connected = bridge.mode === 'readonly' || bridge.mode === 'live';
+  refreshBtn.disabled = !connected;
+
+  if (bridge.mode === 'none') {
+    lockChip.className = 'chip warn';
+    lockText.textContent = 'Bridge not connected';
+    stateEl.textContent = 'Configure and select a host profile above to load the launcher registry from the bridge.';
+    grid.innerHTML = `<div class="stack-card">
+      <div class="name"><span>Launchpad</span><span class="chip"><span class="dot"></span>status unknown</span></div>
+      <div class="role">No host profile connected — launcher cards appear once a bridge is configured.</div>
+    </div>`;
+    return;
+  }
+
+  if (bridge.mode === 'unreachable') {
+    lockChip.className = 'chip bad';
+    lockText.textContent = 'Bridge unreachable';
+    stateEl.textContent = 'Bridge unreachable — no live launcher registry or stack status available.';
+    grid.innerHTML = `<div class="stack-card">
+      <div class="name"><span>Launchpad</span><span class="chip bad"><span class="dot"></span>status unknown</span></div>
+      <div class="role">Bridge unreachable — launcher data is never shown from stale state when the bridge is down.</div>
+    </div>`;
+    return;
+  }
+
+  if (!bridge.launchers) {
+    lockChip.className = 'chip warn';
+    lockText.textContent = 'Launcher unavailable';
+    stateEl.textContent = 'Connected to bridge, but GET /launchers did not return a registry list.';
+    grid.innerHTML = `<div class="stack-card">
+      <div class="name"><span>Launchpad</span><span class="chip warn"><span class="dot"></span>not reported</span></div>
+      <div class="role">Could not read GET /launchers from this bridge.</div>
+    </div>`;
+    return;
+  }
+
+  if (bridge.launcherUnlocked) {
+    lockChip.className = 'chip ok';
+    lockText.textContent = 'Launcher unlocked';
+    stateEl.textContent = `Showing ${bridge.launchers.length} registry entries from ${bridge.launcherHost || 'bridge'} (launcher_unlocked=true).`;
+  } else {
+    lockChip.className = 'chip warn';
+    lockText.textContent = 'Launcher locked';
+    stateEl.textContent = `Showing ${bridge.launchers.length} registry entries from ${bridge.launcherHost || 'bridge'} — Launcher locked on the bridge (launcher_unlocked=false).`;
+  }
+
+  grid.innerHTML = bridge.launchers.map((entry) => {
+    const id = String(entry.id || '');
+    const poll = bridge.launcherPolling[id];
+    const pill = launcherStatusChip(entry.status, poll?.action);
+    const ports = Array.isArray(entry.ports) ? entry.ports : [];
+    const portStatus = entry.port_status && typeof entry.port_status === 'object' ? entry.port_status : {};
+
+    const portsHtml = ports.map((port) => {
+      const up = portStatus[String(port)];
+      const pCls = up === true ? 'ok' : up === false ? 'bad' : '';
+      const pTxt = up === true ? 'up' : up === false ? 'down' : '?';
+      return `<span class="port-pill ${pCls}"><span class="dot"></span>:${escapeHtml(port)} ${pTxt}</span>`;
+    }).join('');
+
+    const procHtml = entry.probe_process
+      ? `<span class="port-pill ${entry.process_up === true ? 'ok' : entry.process_up === false ? 'bad' : ''}"><span class="dot"></span>${escapeHtml(entry.probe_process)} ${entry.process_up === true ? 'up' : entry.process_up === false ? 'down' : '?'}</span>`
+      : '';
+
+    const probeRow = (portsHtml || procHtml)
+      ? `<div class="l-ports">${portsHtml}${procHtml}</div>`
+      : '';
+
+    const metaParts = [];
+    if (entry.last_result) metaParts.push(`Last result: ${entry.last_result}`);
+    if (entry.last_launch_at) metaParts.push(`Last launch: ${entry.last_launch_at}`);
+    if (entry.last_stop_at) metaParts.push(`Last stop: ${entry.last_stop_at}`);
+    const metaHtml = metaParts.length
+      ? `<div class="l-meta">${escapeHtml(metaParts.join(' · '))}</div>`
+      : '';
+
+    const fb = bridge.launcherFeedback[id];
+    const fbHtml = fb && fb.text
+      ? `<div class="l-feedback ${escapeHtml(fb.tone || 'info')}">${escapeHtml(fb.text)}</div>`
+      : '';
+
+    let actionsHtml = '';
+    if (entry.launchable === true) {
+      const busy = Boolean(poll);
+      const launchLabel = poll?.action === 'launch' ? 'Starting…' : 'Launch';
+      const stopLabel = poll?.action === 'stop' ? 'Stopping…' : 'Stop';
+      const hasStop = entry.stop_script !== null && entry.stop_script !== undefined && entry.stop_script !== '';
+      actionsHtml = `<div class="l-actions">
+        <button class="btn small" data-launch-action="launch" data-launch-id="${escapeHtml(id)}" ${busy ? 'disabled' : ''}>${launchLabel}</button>
+        ${hasStop ? `<button class="btn small danger" data-launch-action="stop" data-launch-id="${escapeHtml(id)}" ${busy ? 'disabled' : ''}>${stopLabel}</button>` : ''}
+      </div>`;
+    } else {
+      actionsHtml = `<div class="l-actions">
+        <span class="l-reason">${escapeHtml(entry.state_label || entry.state || 'Not launchable')}</span>
+      </div>`;
+    }
+
+    return `<div class="launcher-card" data-launcher-card="${escapeHtml(id)}">
+      <div class="l-head">
+        <div class="l-title">${escapeHtml(entry.label || id)}</div>
+        <span class="chip ${pill.cls}"><span class="dot"></span>${escapeHtml(pill.text)}</span>
+      </div>
+      <div class="l-desc" title="${escapeHtml(entry.description || '')}">${escapeHtml(entry.description || '')}</div>
+      <div class="l-state">${escapeHtml(entry.state_label || entry.state || '')}</div>
+      ${probeRow}
+      ${metaHtml}
+      ${fbHtml}
+      ${actionsHtml}
+    </div>`;
+  }).join('');
+}
+
+function startLauncherConvergencePoll(entryId, action) {
+  if (bridge.launcherPolling[entryId]?.timerId) {
+    clearTimeout(bridge.launcherPolling[entryId].timerId);
+  }
+  const startedAt = Date.now();
+  const maxDurationMs = 180000;
+  const intervalMs = 3000;
+
+  const tick = async () => {
+    try {
+      await fetchLaunchers();
+      try { bridge.status = await bridgeFetch('/status'); } catch { /* keep going */ }
+    } catch (err) {
+      delete bridge.launcherPolling[entryId];
+      bridge.mode = 'unreachable';
+      bridge.detail = `Unreachable — ${err.message}. The PC may be asleep, the bridge stopped, or this device is off the tailnet.`;
+      bridge.status = null; bridge.session = null; bridge.launchers = null;
+      renderBridge();
+      return;
+    }
+
+    const entry = (bridge.launchers || []).find((x) => x.id === entryId);
+    if (!entry) {
+      delete bridge.launcherPolling[entryId];
+      renderBridge();
+      return;
+    }
+
+    const ports = Array.isArray(entry.ports) ? entry.ports : [];
+    const pMap = entry.port_status && typeof entry.port_status === 'object' ? entry.port_status : {};
+    const downPorts = ports.filter((p) => pMap[String(p)] !== true).map((p) => `:${p}`);
+    const upPorts = ports.filter((p) => pMap[String(p)] === true).map((p) => `:${p}`);
+    const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+
+    if (action === 'launch') {
+      if (entry.status === 'Running') {
+        delete bridge.launcherPolling[entryId];
+        bridge.launcherFeedback[entryId] = {
+          tone: 'ok',
+          text: `Running — all probed ports are up (${ports.map((p) => `:${p}`).join(', ') || 'verified'}).`,
+        };
+        renderBridge();
+        return;
+      }
+      if (Date.now() - startedAt >= maxDurationMs) {
+        delete bridge.launcherPolling[entryId];
+        const stillDown = downPorts.length ? downPorts.join(', ') : 'process probe still down';
+        bridge.launcherFeedback[entryId] = {
+          tone: 'warn',
+          text: `Timed out after 180s (status: ${entry.status}). Still down: ${stillDown}.`,
+        };
+        renderBridge();
+        return;
+      }
+      bridge.launcherFeedback[entryId] = {
+        tone: 'info',
+        text: `starting… (${elapsedSec}s / 180s) — status: ${entry.status}${downPorts.length ? ` · waiting on ${downPorts.join(', ')}` : ''}`,
+      };
+    } else {
+      const allPortsDark = ports.every((p) => pMap[String(p)] === false);
+      if (entry.status === 'Stopped' && allPortsDark) {
+        delete bridge.launcherPolling[entryId];
+        bridge.launcherFeedback[entryId] = {
+          tone: 'ok',
+          text: 'Stopped — all probed ports are dark.',
+        };
+        renderBridge();
+        return;
+      }
+      if (Date.now() - startedAt >= maxDurationMs) {
+        delete bridge.launcherPolling[entryId];
+        const stillUp = upPorts.length ? upPorts.join(', ') : 'process probe still up';
+        bridge.launcherFeedback[entryId] = {
+          tone: 'warn',
+          text: `Stop timed out after 180s (status: ${entry.status}). Still up: ${stillUp}.`,
+        };
+        renderBridge();
+        return;
+      }
+      bridge.launcherFeedback[entryId] = {
+        tone: 'info',
+        text: `stopping… (${elapsedSec}s / 180s) — status: ${entry.status}${upPorts.length ? ` · still up: ${upPorts.join(', ')}` : ''}`,
+      };
+    }
+
+    renderBridge();
+    bridge.launcherPolling[entryId].timerId = setTimeout(tick, intervalMs);
+  };
+
+  bridge.launcherPolling[entryId] = {
+    action,
+    startedAt,
+    timerId: setTimeout(tick, intervalMs),
+  };
+  renderBridge();
+}
+
+async function handleLauncherAction(entryId, action) {
+  const list = bridge.launchers || [];
+  const entry = list.find((x) => x.id === entryId);
+  if (!entry || entry.launchable !== true) return;
+
+  const label = entry.label || entry.id;
+  if (action === 'stop') {
+    if (!window.confirm(`Stop ${label}? This will run its registered stop script on ${entry.host || 'the host'}.`)) {
+      return;
+    }
+  } else if (action === 'launch' && entry.confirm === true) {
+    if (!window.confirm(`Launch ${label} on ${entry.host || 'the host'}?`)) {
+      return;
+    }
+  }
+
+  const route = action === 'stop'
+    ? `/launch/${encodeURIComponent(entry.id)}/stop`
+    : `/launch/${encodeURIComponent(entry.id)}`;
+
+  bridge.launcherFeedback[entry.id] = {
+    tone: 'info',
+    text: action === 'stop' ? 'Sending stop request to bridge…' : 'Sending launch request to bridge…',
+  };
+  renderLaunchpad();
+
+  let res;
+  try {
+    res = await bridgePostLauncher(route);
+  } catch (err) {
+    clearLauncherPolls();
+    bridge.mode = 'unreachable';
+    bridge.detail = `Unreachable — ${err.message}. The PC may be asleep, the bridge stopped, or this device is off the tailnet.`;
+    bridge.status = null; bridge.session = null; bridge.launchers = null;
+    renderBridge();
+    return;
+  }
+
+  const data = res.data || {};
+  if (res.status === 403 && data.error === 'launcher_locked') {
+    bridge.launcherUnlocked = false;
+    bridge.launcherFeedback[entry.id] = {
+      tone: 'info',
+      text: 'Launcher locked on the bridge (launcher_unlocked=false)',
+    };
+    renderLaunchpad();
+    return;
+  }
+
+  if (!res.ok) {
+    const code = data.error ? `${data.error}: ` : '';
+    const msg = data.message || `Bridge returned HTTP ${res.status}`;
+    bridge.launcherFeedback[entry.id] = {
+      tone: 'bad',
+      text: `${code}${msg}`,
+    };
+    try { await fetchLaunchers(); } catch { /* ignore */ }
+    renderLaunchpad();
+    return;
+  }
+
+  if (data.result === 'already_running') {
+    bridge.launcherFeedback[entry.id] = {
+      tone: 'info',
+      text: `Already running (result: already_running — no duplicate process spawned).`,
+    };
+    try { await fetchLaunchers(); } catch { /* ignore */ }
+    renderLaunchpad();
+    return;
+  }
+
+  if (data.result === 'already_stopped') {
+    bridge.launcherFeedback[entry.id] = {
+      tone: 'info',
+      text: `Already stopped (result: already_stopped).`,
+    };
+    try { await fetchLaunchers(); } catch { /* ignore */ }
+    renderLaunchpad();
+    return;
+  }
+
+  if (action === 'launch') {
+    bridge.launcherFeedback[entry.id] = {
+      tone: 'info',
+      text: 'starting… polling GET /launchers every 3s (up to 180s) for ports to converge.',
+    };
+    try { await fetchLaunchers(); } catch { /* ignore */ }
+    startLauncherConvergencePoll(entry.id, 'launch');
+  } else {
+    bridge.launcherFeedback[entry.id] = {
+      tone: 'info',
+      text: 'stopping… polling GET /launchers every 3s (up to 180s) until Stopped and ports dark.',
+    };
+    try { await fetchLaunchers(); } catch { /* ignore */ }
+    startLauncherConvergencePoll(entry.id, 'stop');
+  }
+}
+
+function initLaunchpad() {
+  $('launchpadRefresh').addEventListener('click', async () => {
+    if (bridge.mode !== 'readonly' && bridge.mode !== 'live') return;
+    $('launchpadState').textContent = 'Refreshing launcher registry…';
+    try {
+      await fetchLaunchers();
+      renderLaunchpad();
+    } catch (err) {
+      clearLauncherPolls();
+      bridge.mode = 'unreachable';
+      bridge.detail = `Unreachable — ${err.message}. The PC may be asleep, the bridge stopped, or this device is off the tailnet.`;
+      bridge.status = null; bridge.session = null; bridge.launchers = null;
+      renderBridge();
+    }
+  });
+
+  $('launchpadGrid').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-launch-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.launchAction;
+    const id = btn.dataset.launchId;
+    if (!id || (action !== 'launch' && action !== 'stop')) return;
+    handleLauncherAction(id, action);
+  });
 }
 
 function renderHosts() {
@@ -479,9 +893,9 @@ function initHosts() {
     h.activeId = $('hostActive').value || null;
     store.set('ds.hosts.v1', h);
     renderHosts();
-    bridge.mode = 'none';
-    bridge.detail = 'Host switched — run Check connection to verify this bridge.';
-    renderBridge();
+    clearLauncherPolls();
+    bridge.launcherFeedback = {};
+    checkBridge();
   });
   $('hostSave').addEventListener('click', () => {
     const label = $('hostLabel').value.trim();
@@ -499,6 +913,8 @@ function initHosts() {
     }
     store.set('ds.hosts.v1', h);
     renderHosts();
+    clearLauncherPolls();
+    bridge.launcherFeedback = {};
     checkBridge();
   });
   $('hostDelete').addEventListener('click', () => {
@@ -509,8 +925,16 @@ function initHosts() {
     store.set('ds.hosts.v1', h);
     $('hostLabel').value = ''; $('hostUrl').value = ''; $('hostToken').value = '';
     renderHosts();
-    bridge.mode = 'none'; bridge.detail = 'Profile deleted. Add a host profile to connect to a bridge.';
-    renderBridge();
+    clearLauncherPolls();
+    bridge.launcherFeedback = {};
+    if (activeProfile()) {
+      checkBridge();
+    } else {
+      bridge.mode = 'none';
+      bridge.detail = 'Profile deleted. Add a host profile to connect to a bridge.';
+      bridge.status = null; bridge.session = null; bridge.launchers = null; bridge.launcherUnlocked = false;
+      renderBridge();
+    }
   });
   $('bridgeCheck').addEventListener('click', checkBridge);
   $('bridgeRefresh').addEventListener('click', checkBridge);
@@ -959,6 +1383,7 @@ initNav();
 renderStatusStrip();
 setInterval(renderStatusStrip, 60000);
 initCopyStudio();
+initLaunchpad();
 initHosts();
 initConfig();
 initSessions();

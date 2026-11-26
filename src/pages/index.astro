@@ -185,6 +185,19 @@ import Layout from '../layouts/Layout.astro';
       </div>
 
       <div class="card" style="margin-top:1rem;">
+        <div class="row" style="justify-content:space-between;">
+          <h2>Launchpad</h2>
+          <div class="row">
+            <span class="chip" id="launchpadLockChip"><span class="dot"></span><span id="launchpadLockText">Bridge not connected</span></span>
+            <button class="btn small secondary" id="launchpadRefresh" disabled>Refresh launchers</button>
+          </div>
+        </div>
+        <p class="lede">Allowlisted household stacks served by the active host profile's bridge (<code>GET /launchers</code>). Only entries marked launchable by the bridge render Launch / Stop buttons; all other entries display their status and registry state honestly.</p>
+        <p class="note" id="launchpadState">Connect a bridge to load the launcher registry.</p>
+        <div class="launchpad-grid" id="launchpadGrid"></div>
+      </div>
+
+      <div class="card" style="margin-top:1rem;">
         <h2>Config files</h2>
         <p class="lede">Allowlisted configs the bridge serves: <code>stream-config.json</code>, Mochi personality / profile prompt files, and AI-Mochi vault files. Writes go through the bridge only — backup-first, validated, and revertible — and stay disabled until the bridge reports live control.</p>
         <div class="row">

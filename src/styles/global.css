@@ -227,6 +227,44 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--teal); outl
 .stack-card .role { color: var(--ink-dim); font-size: 0.85rem; margin-top: 0.2rem; }
 .stack-card .port { color: var(--sky); font-weight: 800; font-size: 0.8rem; }
 
+.launchpad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 0.85rem; margin-top: 0.75rem; }
+.launcher-card {
+  border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 0.95rem;
+  background: rgba(7, 39, 43, 0.5);
+  display: flex; flex-direction: column; gap: 0.45rem;
+}
+.launcher-card .l-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+.launcher-card .l-title { font-weight: 800; font-family: 'Baloo 2', sans-serif; font-size: 1.02rem; line-height: 1.25; }
+.launcher-card .l-desc {
+  color: var(--ink-dim); font-size: 0.85rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.launcher-card .l-state {
+  font-size: 0.8rem; font-weight: 700; color: var(--sky);
+  background: rgba(15, 82, 87, 0.55); border: 1px solid var(--line);
+  border-radius: 8px; padding: 0.3rem 0.55rem;
+}
+.launcher-card .l-ports { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.launcher-card .port-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.76rem; font-weight: 800; border: 1px solid var(--line);
+  border-radius: 999px; padding: 0.12rem 0.5rem; background: rgba(7, 39, 43, 0.65); color: var(--ink-dim);
+}
+.launcher-card .port-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+.launcher-card .port-pill.ok .dot { background: var(--ok); }
+.launcher-card .port-pill.bad .dot { background: var(--danger); }
+.launcher-card .l-meta { font-size: 0.79rem; color: var(--ink-faint); font-weight: 700; }
+.launcher-card .l-feedback {
+  font-size: 0.83rem; font-weight: 700; border-radius: 8px; padding: 0.4rem 0.6rem;
+  background: rgba(7, 39, 43, 0.75); border: 1px solid var(--line); color: var(--ink);
+}
+.launcher-card .l-feedback.info { border-color: var(--sky); color: var(--sky); }
+.launcher-card .l-feedback.ok { border-color: var(--ok); color: var(--ok); }
+.launcher-card .l-feedback.warn { border-color: var(--amber); color: var(--amber); }
+.launcher-card .l-feedback.bad { border-color: var(--danger); color: var(--danger); }
+.launcher-card .l-actions { margin-top: auto; padding-top: 0.25rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.launcher-card .l-reason { font-size: 0.81rem; color: var(--ink-faint); font-style: italic; }
+
 .week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.6rem; }
 @media (max-width: 1000px) { .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .week-grid { grid-template-columns: 1fr; } }

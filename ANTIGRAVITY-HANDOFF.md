@@ -132,8 +132,8 @@ PUT|POST /config/item, POST /config/revert
 
 ## 7. Work queue — in order
 
-### Task 1 — Cloudflare Pages connect (operator step, not Antigravity's to perform)
-Joshua connects the repo in Cloudflare Pages **from his own PC browser** (Muse's browser is blocked by Cloudflare verification — do not retry that route). Settings per `DEPLOY-KIT.md`: preset **Astro**, build `npm run build`, output `dist`, production branch `main`. Antigravity's role: be ready to diagnose a failed Pages build from its log if Joshua pastes one.
+### Task 1 — Cloudflare Pages connect ✅ COMPLETE 2026-11-23 (corrected 2026-11-26)
+The Pages project `derrp-studio` was created Git-connected to `main` on 2026-11-23 (first deployment `7941eb5a`, deployed commit `3000a5e3`; preset **Astro**, build `npm run build`, output `dist`, production branch `main`, automatic Git deployments enabled). The stray same-named Worker was deleted. Live at `https://derrp-studio.pages.dev` — re-verified 2026-11-26 serving the current `main` head, including the Companion hub (Task 6) and `/manifest.webmanifest` (Task 5b). Every push to `main` auto-deploys. Antigravity's role now: be ready to diagnose a failed Pages build from its log if Joshua pastes one. (This section previously read as pending — that was stale text predating the connect, corrected 2026-11-26.)
 
 ### Task 2 — Post-deploy verification (after Task 1)
 From `DEPLOY-KIT.md` §3, against `https://derrp-studio.pages.dev`:
@@ -144,7 +144,7 @@ From `DEPLOY-KIT.md` §3, against `https://derrp-studio.pages.dev`:
 - [ ] iPhone layout usable one-handed; Add to Home Screen works
 
 ### Task 3 — Gate 3: Studio panel wiring + kill test (the main event)
-Preconditions: bridge fixes committed (`6a34d73`) and Step 5 kill test PASSED — both already done; Pages live (Task 1) is the only remaining precondition.
+Preconditions: bridge fixes committed (`6a34d73`), Step 5 kill test PASSED, and Pages live (Task 1, complete 2026-11-23) — all met; Gate 3 completed 2026-11-24, so this sequence is retained as the re-test procedure.
 1. Verify the bridge is up — do **not** start a second instance. The duplicate-start guard will refuse it, and that refusal is correct behaviour. Confirm `GET /health` on loopback returns `control_unlocked=false` and the tailnet URL `https://neoderrp.taila861af.ts.net/health` answers. If the bridge is down for any reason, restart it from an **elevated** PowerShell in the bridge workspace only (`.\scripts\Start-MochiBridge.ps1`, then publish Serve per the bridge scripts) and say so in the report.
 2. In the Studio (deployed site), create/select the host profile: label `NeoDerrp (PC)`, base URL `https://neoderrp.taila861af.ts.net`, token entered by Joshua in the browser UI only.
 3. Verify the panel reaches **Connected — read-only**: `/health`, `/status`, `/session`, `/config` list, and one `/config/item?id=...` read all succeed; stack cards show real up/down states (honest DOWN states are a pass when a component is off).
